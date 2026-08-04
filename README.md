@@ -24,7 +24,7 @@ The script uses only Python's standard library and macOS tools (`ditto` and
 ## Check compatibility
 
 ```bash
-python3 cursor_fix_custom_api.py status --app "/Applications/Cursor.app"
+python3 cursor_fix_openai_routing.py status --app "/Applications/Cursor.app"
 ```
 
 The patcher recognizes the vulnerable code by structure rather than hard-coded
@@ -36,9 +36,9 @@ every unknown future version.
 ## Patch a clone (recommended)
 
 ```bash
-python3 cursor_fix_custom_api.py patch \
+python3 cursor_fix_openai_routing.py patch \
   --app "/Applications/Cursor.app" \
-  --output "$HOME/Applications/Cursor Custom API Fix.app"
+  --output "$HOME/Applications/Cursor OpenAI Routing Fix.app"
 ```
 
 Clone mode is non-destructive: it leaves `/Applications/Cursor.app` untouched.
@@ -55,13 +55,13 @@ boolean attachment flags, never API keys or base URL values.
 Preview without writing:
 
 ```bash
-python3 cursor_fix_custom_api.py patch --dry-run --trace
+python3 cursor_fix_openai_routing.py patch --dry-run --trace
 ```
 
 If the destination already exists and should be recreated:
 
 ```bash
-python3 cursor_fix_custom_api.py patch --force-output
+python3 cursor_fix_openai_routing.py patch --force-output
 ```
 
 ## After installation
@@ -85,7 +85,7 @@ python3 cursor_fix_custom_api.py patch --force-output
 Before changing a bundle, the script creates a timestamped backup under:
 
 ```text
-~/Library/Application Support/Cursor Custom API Fix/backups/
+~/Library/Application Support/Cursor OpenAI Routing Fix/backups/
 ```
 
 Each backup contains:
@@ -102,23 +102,23 @@ No backup is created during `--dry-run` or when the app is already patched.
 Restore the newest backup associated with the patched app:
 
 ```bash
-python3 cursor_fix_custom_api.py restore \
-  --app "$HOME/Applications/Cursor Custom API Fix.app"
+python3 cursor_fix_openai_routing.py restore \
+  --app "$HOME/Applications/Cursor OpenAI Routing Fix.app"
 ```
 
 Restore a specific backup:
 
 ```bash
-python3 cursor_fix_custom_api.py restore \
-  --app "$HOME/Applications/Cursor Custom API Fix.app" \
-  --backup "$HOME/Library/Application Support/Cursor Custom API Fix/backups/cursor-VERSION-TIMESTAMP"
+python3 cursor_fix_openai_routing.py restore \
+  --app "$HOME/Applications/Cursor OpenAI Routing Fix.app" \
+  --backup "$HOME/Library/Application Support/Cursor OpenAI Routing Fix/backups/cursor-VERSION-TIMESTAMP"
 ```
 
 Preview a restore:
 
 ```bash
-python3 cursor_fix_custom_api.py restore \
-  --app "$HOME/Applications/Cursor Custom API Fix.app" \
+python3 cursor_fix_openai_routing.py restore \
+  --app "$HOME/Applications/Cursor OpenAI Routing Fix.app" \
   --dry-run
 ```
 
@@ -135,7 +135,7 @@ originals. Clone mode preserves the untouched source application.
 Patching the original installation is supported but discouraged:
 
 ```bash
-python3 cursor_fix_custom_api.py patch \
+python3 cursor_fix_openai_routing.py patch \
   --app "/Applications/Cursor.app" \
   --in-place
 ```

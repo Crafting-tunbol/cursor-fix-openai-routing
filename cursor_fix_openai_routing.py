@@ -20,13 +20,17 @@ from typing import Match
 
 
 DEFAULT_APP = Path("/Applications/Cursor.app")
-DEFAULT_OUTPUT = Path.home() / "Applications" / "Cursor Custom API Fix.app"
+DEFAULT_OUTPUT = Path.home() / "Applications" / "Cursor OpenAI Routing Fix.app"
 DEFAULT_BACKUP_ROOT = (
-    Path.home() / "Library" / "Application Support" / "Cursor Custom API Fix" / "backups"
+    Path.home()
+    / "Library"
+    / "Application Support"
+    / "Cursor OpenAI Routing Fix"
+    / "backups"
 )
 BUNDLE_GLOB = "Contents/Resources/app/out/vs/workbench/workbench.*.main.js"
 SUPPORTED_BUNDLES = {"workbench.desktop.main.js", "workbench.glass.main.js"}
-PATCH_MARKER = "[cursor-fix-custom-api]"
+PATCH_MARKER = "[cursor-fix-openai-routing]"
 GREEN = "\033[1;32m"
 RESET = "\033[0m"
 SUCCESS_INSTRUCTIONS = (
@@ -447,7 +451,7 @@ def color_enabled(stream: object = sys.stdout) -> bool:
 
 
 def print_patch_success(target: Path, backup: Path, stream: object = sys.stdout) -> None:
-    heading = "✓ Cursor Custom API Fix installed successfully"
+    heading = "✓ Cursor OpenAI Routing Fix installed successfully"
     if color_enabled(stream):
         heading = f"{GREEN}{heading}{RESET}"
     print(heading, file=stream)
@@ -611,7 +615,7 @@ def command_status(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Safely patch Cursor for per-model custom API key routing on macOS."
+        description="Safely patch Cursor for per-model OpenAI API key routing on macOS."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

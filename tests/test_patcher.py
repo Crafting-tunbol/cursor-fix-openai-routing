@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import cursor_fix_custom_api as patcher
+import cursor_fix_openai_routing as patcher
 
 
 class Output(io.StringIO):
