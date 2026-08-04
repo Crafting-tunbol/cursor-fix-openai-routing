@@ -1,15 +1,16 @@
 # Cursor Custom API Routing Fix
 
-A guarded macOS patcher for a Cursor routing bug where an enabled OpenAI API key
-is attached to explicitly selected Cursor-hosted models such as Composer or
-Cursor Grok.
+Because Cursor won't fix it.
+
+A guarded macOS Python patcher for the internal JS routing bug that causes
+"This model does not support custom APIs" when an enabled OpenAI API key is
+incorrectly attached to Cursor-hosted models such as Composer or Cursor Grok.
 
 The patch changes routing, not the error message:
 
 - OpenAI BYOK is used only for OpenAI-family model IDs or user-added models.
 - Cursor-hosted models do not inherit the OpenAI key.
 - The custom OpenAI base URL is attached only when an OpenAI key is attached.
-- Claude, Gemini, Azure, and Bedrock routing is left unchanged.
 
 ## Requirements
 
