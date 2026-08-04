@@ -1,4 +1,4 @@
-# Cursor Custom API Routing Fix
+# Cursor OpenAI Routing Fix
 
 Because Cursor won't fix it.
 
