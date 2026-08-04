@@ -44,19 +44,64 @@ def vulnerable_bundle(
     )
 
 
+def make_macos_app(root: Path, version: str = "9.9.9") -> Path:
+    app = root / "Cursor Test.app"
+    workbench = (
+        app / "Contents" / "Resources" / "app" / "out" / "vs" / "workbench"
+    )
+    workbench.mkdir(parents=True)
+    info = app / "Contents" / "Info.plist"
+    with info.open("wb") as handle:
+        plistlib.dump({"CFBundleShortVersionString": version}, handle)
+    return app
+
+
+def make_windows_app(root: Path, version: str = "9.9.9") -> Path:
+    app = root / "cursor"
+    workbench = app / "resources" / "app" / "out" / "vs" / "workbench"
+    workbench.mkdir(parents=True)
+    product = {
+        "nameShort": "Cursor",
+        "version": version,
+        "commit": "deadbeef",
+        "quality": "stable",
+    }
+    (app / "resources" / "app" / "product.json").write_text(
+        json.dumps(product), encoding="utf-8"
+    )
+    (app / "Cursor.exe").write_text("stub", encoding="utf-8")
+    return app
+
+
 class PatcherTests(unittest.TestCase):
     def test_success_instructions_use_color_on_tty(self):
         output = Output(tty=True)
-        with patch.dict(os.environ, {}, clear=True):
-            patcher.print_patch_success(
-                Path("/tmp/Fixed.app"), Path("/tmp/backup"), output
-            )
+        with tempfile.TemporaryDirectory() as directory:
+            app = make_macos_app(Path(directory))
+            with patch.dict(os.environ, {}, clear=True):
+                patcher.print_patch_success(app, Path("/tmp/backup"), output)
         value = output.getvalue()
         self.assertIn(patcher.GREEN, value)
         self.assertIn("Always Allow", value)
         self.assertIn("shell environment timeout", value)
         self.assertIn("appears to be corrupt", value)
+        self.assertIn("Some machines never show the banner", value)
+        self.assertIn("shortcut/Dock icon", value)
         self.assertIn("/Applications/Cursor.app untouched", value)
+
+    def test_windows_success_instructions(self):
+        output = Output(tty=False)
+        with tempfile.TemporaryDirectory() as directory:
+            app = make_windows_app(Path(directory))
+            with patch.dict(os.environ, {}, clear=True):
+                patcher.print_patch_success(app, Path("/tmp/backup"), output)
+        value = output.getvalue()
+        self.assertIn("Cursor.exe", value)
+        self.assertIn("appears to be corrupt", value)
+        self.assertIn("Some machines never show the banner", value)
+        self.assertIn("Start Menu / taskbar / desktop", value)
+        self.assertIn("Local\\Programs\\cursor", value)
+        self.assertNotIn("Always Allow", value)
 
     def test_success_instructions_disable_color_for_non_tty_or_no_color(self):
         for tty, environment in ((False, {}), (True, {"NO_COLOR": "1"})):
@@ -87,8 +132,8 @@ class PatcherTests(unittest.TestCase):
         )
         output = io.StringIO()
         with (
-            patch.object(patcher, "discover_bundles", return_value=[plan.path]),
-            patch.object(patcher, "plan_bundle", return_value=plan),
+            patch("cursor_openai_routing.cli.discover_bundles", return_value=[plan.path]),
+            patch("cursor_openai_routing.cli.plan_bundle", return_value=plan),
             patch("sys.stdout", output),
         ):
             patcher.command_patch(args)
@@ -125,20 +170,10 @@ class PatcherTests(unittest.TestCase):
     def test_backup_and_restore_are_exact(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            app = root / "Cursor Test.app"
+            app = make_macos_app(root)
             workbench = (
-                app
-                / "Contents"
-                / "Resources"
-                / "app"
-                / "out"
-                / "vs"
-                / "workbench"
+                app / "Contents" / "Resources" / "app" / "out" / "vs" / "workbench"
             )
-            workbench.mkdir(parents=True)
-            info = app / "Contents" / "Info.plist"
-            with info.open("wb") as handle:
-                plistlib.dump({"CFBundleShortVersionString": "9.9.9"}, handle)
             bundle = workbench / "workbench.desktop.main.js"
             original = vulnerable_bundle()
             bundle.write_text(original, encoding="utf-8")
@@ -157,32 +192,114 @@ class PatcherTests(unittest.TestCase):
                     "dry_run": False,
                 },
             )()
-            with patch.object(patcher, "sign_app"):
+            with patch("cursor_openai_routing.cli.sign_app"):
                 patcher.command_restore(args)
             self.assertEqual(bundle.read_text(encoding="utf-8"), original)
             manifest = json.loads((backup / "manifest.json").read_text())
+            self.assertEqual(manifest["layout"], "macos")
+            self.assertEqual(
+                manifest["files"][0]["relative_path"],
+                "Contents/Resources/app/out/vs/workbench/workbench.desktop.main.js",
+            )
             self.assertEqual(
                 manifest["files"][0]["original_sha256"],
                 patcher.sha256_bytes(original.encode()),
             )
 
-    def test_restore_refuses_file_changed_after_patch(self):
+    def test_windows_layout_detect_version_and_patch_in_place(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            app = root / "Cursor Test.app"
-            workbench = (
-                app
-                / "Contents"
-                / "Resources"
+            app = make_windows_app(root, version="3.9.16")
+            workbench = app / "resources" / "app" / "out" / "vs" / "workbench"
+            bundle = workbench / "workbench.desktop.main.js"
+            original = vulnerable_bundle()
+            bundle.write_text(original, encoding="utf-8")
+            # Simulate a read-only Program Files-style install.
+            bundle.chmod(0o444)
+
+            self.assertEqual(patcher.detect_layout(app).kind, "windows")
+            self.assertEqual(patcher.app_version(app), "3.9.16")
+            self.assertEqual(
+                [path.name for path in patcher.discover_bundles(app)],
+                ["workbench.desktop.main.js"],
+            )
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "app": app,
+                    "output": None,
+                    "in_place": True,
+                    "force_output": False,
+                    "dry_run": False,
+                    "trace": False,
+                    "backup_root": root / "backups",
+                },
+            )()
+            with patch("sys.stdout", io.StringIO()):
+                patcher.command_patch(args)
+
+            patched = bundle.read_text(encoding="utf-8")
+            self.assertNotEqual(patched, original)
+            self.assertEqual(
+                patcher.plan_bundle(bundle, trace=False).state, "already-patched"
+            )
+            manifest = json.loads(
+                next((root / "backups").iterdir()).joinpath("manifest.json").read_text()
+            )
+            self.assertEqual(manifest["layout"], "windows")
+            self.assertEqual(
+                manifest["files"][0]["relative_path"],
+                "resources/app/out/vs/workbench/workbench.desktop.main.js",
+            )
+
+    def test_windows_clone_and_sign_noop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = make_windows_app(root / "source", version="1.2.3")
+            workbench = source / "resources" / "app" / "out" / "vs" / "workbench"
+            (workbench / "workbench.desktop.main.js").write_text(
+                vulnerable_bundle(), encoding="utf-8"
+            )
+            output = root / "Cursor OpenAI Routing Fix"
+            args = type(
+                "Args",
+                (),
+                {
+                    "app": source,
+                    "output": output,
+                    "in_place": False,
+                    "force_output": False,
+                    "dry_run": False,
+                    "trace": False,
+                    "backup_root": root / "backups",
+                },
+            )()
+            with patch("sys.stdout", io.StringIO()):
+                patcher.command_patch(args)
+            self.assertTrue((output / "Cursor.exe").is_file())
+            plan = patcher.plan_bundle(
+                output
+                / "resources"
                 / "app"
                 / "out"
                 / "vs"
                 / "workbench"
+                / "workbench.desktop.main.js",
+                trace=False,
             )
-            workbench.mkdir(parents=True)
-            info = app / "Contents" / "Info.plist"
-            with info.open("wb") as handle:
-                plistlib.dump({"CFBundleShortVersionString": "9.9.9"}, handle)
+            self.assertEqual(plan.state, "already-patched")
+            # Windows layouts skip codesign; this must not raise.
+            patcher.sign_app(output)
+
+    def test_restore_refuses_file_changed_after_patch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            app = make_macos_app(root)
+            workbench = (
+                app / "Contents" / "Resources" / "app" / "out" / "vs" / "workbench"
+            )
             bundle = workbench / "workbench.desktop.main.js"
             bundle.write_text(vulnerable_bundle(), encoding="utf-8")
             plan = patcher.plan_bundle(bundle, trace=False)

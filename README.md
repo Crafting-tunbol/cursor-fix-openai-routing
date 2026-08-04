@@ -2,9 +2,12 @@
 
 Because Cursor won't fix it.
 
-A guarded macOS Python patcher for the internal JS routing bug that causes
+A guarded Python patcher for the internal JS routing bug that causes
 "This model does not support custom APIs" when an enabled OpenAI API key is
 incorrectly attached to Cursor-hosted models such as Composer or Cursor Grok.
+
+Supports **macOS** and **Windows** (including patching a Windows install from
+WSL by pointing `--app` at the Windows path).
 
 The patch changes routing, not the error message:
 
@@ -14,17 +17,35 @@ The patch changes routing, not the error message:
 
 ## Requirements
 
-- macOS
+- macOS, Windows, or WSL
 - Python 3.10 or newer
-- An installed `Cursor.app`
+- An installed Cursor application
 
-The script uses only Python's standard library and macOS tools (`ditto` and
-`codesign`).
+The script uses only Python's standard library. On macOS it also uses
+`ditto` and `codesign`. On Windows there is no codesign step.
 
 ## Check compatibility
 
+macOS:
+
 ```bash
 python3 cursor_fix_openai_routing.py status --app "/Applications/Cursor.app"
+```
+
+Windows (PowerShell or cmd):
+
+```bash
+python cursor_fix_openai_routing.py status --app "$env:LOCALAPPDATA\Programs\cursor"
+```
+
+WSL against a Windows install:
+
+```bash
+python3 cursor_fix_openai_routing.py status \
+  --app "/mnt/c/Program Files/cursor"
+# or, for a per-user install:
+python3 cursor_fix_openai_routing.py status \
+  --app "/mnt/c/Users/$USER/AppData/Local/Programs/cursor"
 ```
 
 The patcher recognizes the vulnerable code by structure rather than hard-coded
@@ -35,15 +56,28 @@ every unknown future version.
 
 ## Patch a clone (recommended)
 
+### macOS
+
 ```bash
 python3 cursor_fix_openai_routing.py patch \
   --app "/Applications/Cursor.app" \
   --output "$HOME/Applications/Cursor OpenAI Routing Fix.app"
 ```
 
-Clone mode is non-destructive: it leaves `/Applications/Cursor.app` untouched.
-The patcher modifies only files inside the cloned app bundle, while backup
-copies and manifests are written to the backup directory documented below.
+### Windows
+
+```bash
+python cursor_fix_openai_routing.py patch `
+  --app "$env:LOCALAPPDATA\Programs\cursor" `
+  --output "$env:LOCALAPPDATA\Programs\Cursor OpenAI Routing Fix"
+```
+
+Prefer a per-user install under `%LOCALAPPDATA%\Programs\cursor`. System-wide
+installs under `C:\Program Files\cursor` often require elevation to modify.
+
+Clone mode is non-destructive: it leaves the original Cursor install untouched.
+The patcher modifies only files inside the clone, while backup copies and
+manifests are written to the backup directory documented below.
 
 The clone intentionally shares Cursor's existing global configuration. It does
 not modify or interfere with your settings, extensions, conversations, or API
@@ -66,6 +100,8 @@ python3 cursor_fix_openai_routing.py patch --force-output
 
 ## After installation
 
+### macOS
+
 1. Open the new fixed app.
 2. macOS or Cursor will warn that the installation files were modified. This
    warning is expected for a locally fixed application.
@@ -75,24 +111,46 @@ python3 cursor_fix_openai_routing.py patch --force-output
    reasonable time” if the Safe Storage prompt blocked startup.
 5. After granting access, fully quit the fixed app and open it again. The shell
    environment warning should then be resolved.
-6. Cursor may also show **“Your Cursor installation appears to be corrupt.
-   Please reinstall”** on every launch. That is expected: Cursor integrity-checks
-   its files and treats the patch as an unknown modification. Do not reinstall
-   solely because of that message.
+6. Cursor may show **“Your Cursor installation appears to be corrupt. Please
+   reinstall”** or mark the window as Unsupported. That comes from Cursor's
+   cross-platform integrity check of patched files—not a macOS-only check. It
+   is safe to ignore; do not reinstall solely because of it. Some machines never
+   show the banner (for example if it was dismissed for this build, or if a
+   pending update suppresses it).
+7. Optional: replace your usual Dock / Applications shortcut with the fixed app
+   path so everyday launches use the patched build.
+
+### Windows
+
+1. Open the fixed `Cursor.exe`.
+2. Cursor may warn that the installation files were modified. This is expected.
+3. Cursor may show **“Your Cursor installation appears to be corrupt. Please
+   reinstall”** or mark the window as Unsupported. Same integrity check as on
+   macOS; safe to ignore if it appears. Some Windows installs never show it.
+4. Optional: replace your Start Menu / taskbar / desktop Cursor shortcut so it
+   points at the fixed install path for convenience.
 
 ## Backups
 
 Before changing a bundle, the script creates a timestamped backup under:
 
+macOS:
+
 ```text
 ~/Library/Application Support/Cursor OpenAI Routing Fix/backups/
+```
+
+Windows / WSL (Windows profile):
+
+```text
+%LOCALAPPDATA%\Cursor OpenAI Routing Fix\backups\
 ```
 
 Each backup contains:
 
 - The exact original bytes of every modified bundle
 - A JSON manifest
-- Cursor version and target application path
+- Cursor version, layout (`macos` / `windows`), and target application path
 - Original and patched SHA-256 checksums
 
 No backup is created during `--dry-run` or when the app is already patched.
@@ -101,9 +159,18 @@ No backup is created during `--dry-run` or when the app is already patched.
 
 Restore the newest backup associated with the patched app:
 
+macOS:
+
 ```bash
 python3 cursor_fix_openai_routing.py restore \
   --app "$HOME/Applications/Cursor OpenAI Routing Fix.app"
+```
+
+Windows:
+
+```bash
+python cursor_fix_openai_routing.py restore `
+  --app "$env:LOCALAPPDATA\Programs\Cursor OpenAI Routing Fix"
 ```
 
 Restore a specific backup:
@@ -122,10 +189,10 @@ python3 cursor_fix_openai_routing.py restore \
   --dry-run
 ```
 
-Restoration validates backup checksums, atomically restores each file, and
-verifies the application. It refuses to overwrite a file whose hash differs
-from both the recorded original and patched versions, preventing an old backup
-from silently replacing files installed by a later Cursor update.
+Restoration validates backup checksums, atomically restores each file, and on
+macOS re-signs the application. It refuses to overwrite a file whose hash
+differs from both the recorded original and patched versions, preventing an
+old backup from silently replacing files installed by a later Cursor update.
 
 Restored bundle payloads are byte-for-byte identical to their recorded
 originals. Clone mode preserves the untouched source application.
@@ -134,14 +201,24 @@ originals. Clone mode preserves the untouched source application.
 
 Patching the original installation is supported but discouraged:
 
+macOS:
+
 ```bash
 python3 cursor_fix_openai_routing.py patch \
   --app "/Applications/Cursor.app" \
   --in-place
 ```
 
-Writing under `/Applications` may require permissions. Cursor updates can
-overwrite an in-place patch.
+Windows:
+
+```bash
+python cursor_fix_openai_routing.py patch `
+  --app "$env:LOCALAPPDATA\Programs\cursor" `
+  --in-place
+```
+
+Writing under `/Applications` or `C:\Program Files` may require elevated
+permissions. Cursor updates can overwrite an in-place patch.
 
 ## Updating Cursor
 
