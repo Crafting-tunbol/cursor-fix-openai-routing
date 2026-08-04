@@ -55,6 +55,7 @@ class PatcherTests(unittest.TestCase):
         self.assertIn(patcher.GREEN, value)
         self.assertIn("Always Allow", value)
         self.assertIn("shell environment timeout", value)
+        self.assertIn("appears to be corrupt", value)
         self.assertIn("/Applications/Cursor.app untouched", value)
 
     def test_success_instructions_disable_color_for_non_tty_or_no_color(self):

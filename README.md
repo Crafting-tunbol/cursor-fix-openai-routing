@@ -74,6 +74,10 @@ python3 cursor_fix_custom_api.py patch --force-output
    reasonable time” if the Safe Storage prompt blocked startup.
 5. After granting access, fully quit the fixed app and open it again. The shell
    environment warning should then be resolved.
+6. Cursor may also show **“Your Cursor installation appears to be corrupt.
+   Please reinstall”** on every launch. That is expected: Cursor integrity-checks
+   its files and treats the patch as an unknown modification. Do not reinstall
+   solely because of that message.
 
 ## Backups
 

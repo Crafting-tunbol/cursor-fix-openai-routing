@@ -39,6 +39,10 @@ SUCCESS_INSTRUCTIONS = (
     "prompt blocked startup.\n"
     "  4. After granting access, fully quit the fixed app and open it again; "
     "the timeout should be resolved.\n"
+    '  5. Cursor may also show "Your Cursor installation appears to be corrupt. '
+    'Please reinstall" on every launch. That is expected: Cursor integrity-checks '
+    "its files and treats the patch as an unknown modification. Do not reinstall "
+    "solely because of that message.\n"
     "\n"
     "Clone mode leaves /Applications/Cursor.app untouched. The clone shares "
     "your existing Cursor settings, extensions, conversations, and API keys; "
